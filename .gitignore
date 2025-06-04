@@ -1,0 +1,6 @@
+# Ignore downloaded image folders
+image_data/
+*.pyc
+__pycache__/
+
+
