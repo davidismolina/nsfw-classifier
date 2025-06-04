@@ -4,3 +4,4 @@ image_data/
 __pycache__/
 
 
+nsfw_classifier.pth
