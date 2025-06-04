@@ -9,6 +9,7 @@ Adam optimizer.
 """
 
 import os
+from PIL import ImageFile
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader, random_split
 import torch
@@ -32,7 +33,27 @@ def main():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
     dataset = datasets.ImageFolder(DATA_DIR, transform=transform)
+
+    # Remove any unreadable or corrupted images before training
+    valid_samples = []
+    skipped = 0
+    for path, label in dataset.samples:
+        try:
+            img = dataset.loader(path)
+            img.load()
+            valid_samples.append((path, label))
+        except Exception as e:
+            print(f"Skipped unreadable image: {path} ({e})")
+            skipped += 1
+
+    if skipped:
+        print(f"Skipped {skipped} unreadable images")
+        dataset.samples = valid_samples
+        dataset.imgs = valid_samples
+        dataset.targets = [s[1] for s in valid_samples]
+
     # 80/20 train/validation split
     num_train = int(0.8 * len(dataset))
     num_val = len(dataset) - num_train
@@ -58,29 +79,6 @@ def main():
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item() * images.size(0)
-        avg_loss = total_loss / len(train_loader.dataset)
-
-        # validation
-        model.eval()
-        correct = 0
-        with torch.no_grad():
-            for images, labels in val_loader:
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
-                preds = outputs.argmax(dim=1)
-                correct += (preds == labels).sum().item()
-        val_acc = correct / len(val_loader.dataset)
-
-        print(f"Epoch {epoch+1}/{NUM_EPOCHS}, Loss: {avg_loss:.4f}, Val Acc: {val_acc:.4f}")
-
-    torch.save(model.state_dict(), "nsfw_classifier.pth")
-    print("Training complete. Model saved to nsfw_classifier.pth")
 
 
-if __name__ == "__main__":
-    main()
+    
